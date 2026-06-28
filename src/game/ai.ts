@@ -92,6 +92,14 @@ function staticEval(board: Board, me: Color, colors: Color[]): number {
   return material * 5 + myCorners * 4 - oppCorners * 3;
 }
 
+/** Self-focused eval: own material + own mobility only (NO opponent blocking).
+ *  Used by 強(hard) so it develops its own position without ganging up on the player. */
+function selfEval(board: Board, me: Color): number {
+  const material = countColor(board, me);
+  const myCorners = getAnchors(board, me, false).length;
+  return material * 5 + myCorners * 4;
+}
+
 /** Full eval: static + territory control (more expensive). */
 function fullEval(board: Board, me: Color, colors: Color[]): number {
   return staticEval(board, me, colors) + territoryCount(board, me, colors) * 1.2;
@@ -125,7 +133,7 @@ export function pickMove(
     case 'medium':
       return pickMedium(moves);
     case 'hard':
-      return pickHard(board, moves, color, colors);
+      return pickHard(board, moves, color);
     case 'expert':
       return pickExpert(board, moves, color, colors, players);
   }
@@ -151,12 +159,14 @@ function pickMedium(moves: ValidMove[]): ValidMove {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function pickHard(board: Board, moves: ValidMove[], color: Color, colors: Color[]): ValidMove {
+function pickHard(board: Board, moves: ValidMove[], color: Color): ValidMove {
+  // Self-development only: big pieces + keep own options open. No active blocking
+  // of opponents (that "3 CPUs gang up on you" feel is reserved for 鬼/expert).
   let bestScore = -Infinity;
   let best: ValidMove[] = [];
   for (const m of moves) {
     const nb = applyPlacement(board, m.cells, m.row, m.col, color);
-    const score = staticEval(nb, color, colors);
+    const score = selfEval(nb, color) - centerDist(m) * 0.3; // mild pull toward centre
     if (score > bestScore) {
       bestScore = score;
       best = [m];

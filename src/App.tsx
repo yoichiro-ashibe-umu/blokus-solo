@@ -124,19 +124,15 @@ export default function App() {
       const current = state.players[state.currentPlayerIndex];
       if (!current?.isHuman || state.phase !== 'playing') return;
 
-      if (e.key === 'ArrowUp') {
+      // 十字キーで全8向きを巡回（上/右=次、下/左=前）
+      if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
         e.preventDefault();
-        dispatch({ type: 'ROTATE' });        // 上: 時計回りに回転
-      } else if (e.key === 'ArrowDown') {
+        dispatch({ type: 'ROTATE' });
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
         e.preventDefault();
-        dispatch({ type: 'ROTATE_CCW' });    // 下: 反時計回りに回転
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        dispatch({ type: 'FLIP' });          // 左右: 左右反転
+        dispatch({ type: 'ROTATE_CCW' });
       } else if (e.key === 'r' || e.key === 'R') {
         dispatch({ type: 'ROTATE' });
-      } else if (e.key === 'f' || e.key === 'F') {
-        dispatch({ type: 'FLIP' });
       } else if (e.key === 'Enter') {
         e.preventDefault();
         const target = state.pendingCell ?? state.hoverCell;
@@ -265,7 +261,6 @@ export default function App() {
             state={state}
             onRotate={() => dispatch({ type: 'ROTATE' })}
             onRotateCcw={() => dispatch({ type: 'ROTATE_CCW' })}
-            onFlip={() => dispatch({ type: 'FLIP' })}
             onConfirm={handleConfirm}
             onCancel={handleCancel}
             onPass={handlePass}

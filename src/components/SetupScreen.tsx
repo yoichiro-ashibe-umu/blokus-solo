@@ -10,8 +10,8 @@ interface Props {
 const DIFFICULTIES: { id: Difficulty; label: string; desc: string; icon: string }[] = [
   { id: 'easy',   label: '弱',  icon: 'diff-easy.png',   desc: 'ランダム寄り。初心者向け' },
   { id: 'medium', label: '中',  icon: 'diff-medium.png', desc: '大きいピース優先の貪欲法' },
-  { id: 'hard',   label: '強',  icon: 'diff-hard.png',   desc: '評価関数で妨害も考慮' },
-  { id: 'expert', label: '鬼',  icon: 'diff-oni.png',    desc: '1〜2手先読み。本気モード' },
+  { id: 'hard',   label: '強',  icon: 'diff-hard.png',   desc: '盤面を評価して着実に展開' },
+  { id: 'expert', label: '鬼',  icon: 'diff-oni.png',    desc: '先読み＋3体で妨害。本気' },
 ];
 
 export const SetupScreen: React.FC<Props> = ({ onStart, onShowHistory }) => {

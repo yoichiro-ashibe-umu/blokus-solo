@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { GameState, getCurrentCells } from '../game/gameState';
+import { GameState, getCurrentCells, BASE_CELLS_MAP } from '../game/gameState';
+import { getOrientationsCached } from '../game/pieces';
 import { isValidPlacement } from '../game/board';
 import { PieceShape } from './PieceShape';
 import { iconUrl } from '../utils/asset';
@@ -8,7 +9,6 @@ interface Props {
   state: GameState;
   onRotate: () => void;
   onRotateCcw: () => void;
-  onFlip: () => void;
   onConfirm: () => void;
   onCancel: () => void;
   onPass: () => void;
@@ -28,7 +28,6 @@ export const GameControls: React.FC<Props> = ({
   state,
   onRotate,
   onRotateCcw,
-  onFlip,
   onConfirm,
   onCancel,
   onPass,
@@ -36,10 +35,11 @@ export const GameControls: React.FC<Props> = ({
   onToggleHints,
   onToggleSound,
 }) => {
-  const { players, currentPlayerIndex, selectedPieceId, hoverCell, pendingCell, flipped, history, showHints, soundEnabled, cpuThinking, phase } = state;
+  const { players, currentPlayerIndex, selectedPieceId, orientationIndex, hoverCell, pendingCell, history, showHints, soundEnabled, cpuThinking, phase } = state;
   const currentPlayer = players[currentPlayerIndex];
   const isHumanTurn = currentPlayer?.isHuman && phase === 'playing';
   const currentCells = getCurrentCells(state);
+  const orientCount = selectedPieceId ? getOrientationsCached(BASE_CELLS_MAP.get(selectedPieceId)!).length : 1;
 
   const targetCell = pendingCell ?? hoverCell;
   const canConfirm = useMemo(() => {
@@ -50,9 +50,18 @@ export const GameControls: React.FC<Props> = ({
 
   // Step-by-step guidance
   let guide = '';
+  const firstMove = isHumanTurn && currentPlayer && !currentPlayer.hasPlaced;
   if (isHumanTurn) {
-    if (!selectedPieceId) guide = '① 下のピースを1つ選びましょう';
-    else if (!pendingCell && !canConfirm) guide = '② 盤面をクリック／タップして置く場所を決めます';
+    if (!selectedPieceId) {
+      guide = firstMove
+        ? '① ピースを選び、青く光る「左上の角」からスタート！'
+        : '① 下のピースを1つ選びましょう';
+    }
+    else if (!pendingCell && !canConfirm) {
+      guide = firstMove
+        ? '② 左上の角を必ず含むように置きます（青く光るマス）'
+        : '② 盤面をクリック／タップして置く場所を決めます';
+    }
     else if (canConfirm) guide = '③ クリックまたは「確定」で配置！';
     else guide = '置けない場所です。別の場所か向きを試してください';
   } else if (phase === 'playing') {
@@ -80,45 +89,37 @@ export const GameControls: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Selected piece preview + rotation / flip */}
+      {/* Selected piece preview + orientation cycling */}
       {isHumanTurn && selectedPieceId && currentCells.length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">選択中のピース</span>
-            {flipped && <span className="text-xs text-pink-300">⇌ 反転中</span>}
+            <span className="text-xs text-slate-500">向き {(orientationIndex % orientCount) + 1}/{orientCount}</span>
           </div>
           <div className="bg-slate-800 rounded-lg p-2 flex items-center justify-center min-h-[64px]">
             <PieceShape cells={currentCells} color={currentPlayer.color} cellSize={18} />
           </div>
-          {/* Rotate buttons (↑↓ keys) */}
+          {/* Orientation buttons (cycle all rotations + mirrors) */}
           <div className="flex gap-2">
             <button
               onClick={onRotateCcw}
-              className="flex-1 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 active:scale-95 text-white text-sm font-medium transition-all"
-              title="左回転 (↓キー)"
+              disabled={orientCount <= 1}
+              className="flex-1 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 active:scale-95 disabled:opacity-30 text-white text-sm font-medium transition-all"
+              title="前の向き (←/↓キー)"
             >
-              ↺ 回転
+              ◀ 向き
             </button>
             <button
               onClick={onRotate}
-              className="flex-1 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 active:scale-95 text-white text-sm font-medium transition-all"
-              title="右回転 (↑キー)"
+              disabled={orientCount <= 1}
+              className="flex-1 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 active:scale-95 disabled:opacity-30 text-white text-sm font-medium transition-all"
+              title="次の向き (→/↑キー)"
             >
-              回転 ↻
+              向き ▶
             </button>
           </div>
-          {/* Flip button (←→ keys) */}
-          <button
-            onClick={onFlip}
-            className={`w-full py-2.5 rounded-lg active:scale-95 text-sm font-medium transition-all ${
-              flipped ? 'bg-pink-700 hover:bg-pink-600 text-white' : 'bg-slate-700 hover:bg-slate-600 text-white'
-            }`}
-            title="左右反転 (←→キー)"
-          >
-            ⇌ 左右反転
-          </button>
           <p className="text-[10px] text-slate-500 text-center -mt-1 leading-relaxed">
-            キー操作：↑↓=回転 / ←→=反転 / Enter=配置
+            十字キーで向きを変えられます（全{orientCount}向き）／ Enter で配置
           </p>
         </div>
       )}

@@ -31,6 +31,15 @@ body {
   }
 }
 
+/* "Start here" hint bounce on the first move */
+@keyframes startHintBounce {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-3px, -3px); }
+}
+.start-hint-bounce {
+  animation: startHintBounce 0.9s ease-in-out infinite;
+}
+
 /* Smooth piece placement animation */
 @keyframes pop {
   0% { transform: scale(0.7); opacity: 0; }

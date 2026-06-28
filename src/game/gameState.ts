@@ -1,5 +1,5 @@
 import { Board, Color, COLORS, createBoard, applyPlacement, hasAnyMove, cloneBoard } from './board';
-import { Cells, PIECES, rotateCells, flipCells, normalizeCells } from './pieces';
+import { Cells, PIECES, getOrientationsCached } from './pieces';
 import { Difficulty } from './ai';
 
 export type { Difficulty };
@@ -31,8 +31,7 @@ export interface GameState {
   currentPlayerIndex: number;
   turnId: number;   // increments every turn; ensures the CPU effect re-fires even when the same player plays consecutively
   selectedPieceId: string | null;
-  rotation: number;   // 0-3, number of 90° clockwise rotations
-  flipped: boolean;   // horizontal mirror applied after rotation
+  orientationIndex: number;  // index into the piece's unique orientations (rotation + mirror), cycled by arrow keys
   hoverCell: [number, number] | null;   // desktop: cell under the mouse
   pendingCell: [number, number] | null; // mobile: tapped target awaiting confirm
   history: HistoryEntry[];
@@ -47,9 +46,8 @@ export type GameAction =
   | { type: 'SELECT_PIECE'; pieceId: string }
   | { type: 'SET_HOVER'; cell: [number, number] | null }
   | { type: 'SET_PENDING'; cell: [number, number] | null }
-  | { type: 'ROTATE' }       // rotate 90° clockwise
-  | { type: 'ROTATE_CCW' }   // rotate 90° counter-clockwise
-  | { type: 'FLIP' }         // mirror horizontally
+  | { type: 'ROTATE' }       // next orientation (cycles all rotations + mirrors)
+  | { type: 'ROTATE_CCW' }   // previous orientation
   | { type: 'PLACE_PIECE'; row: number; col: number }
   | { type: 'PASS' }
   | { type: 'UNDO' }
@@ -80,8 +78,7 @@ export const initialState: GameState = {
   currentPlayerIndex: 0,
   turnId: 0,
   selectedPieceId: null,
-  rotation: 0,
-  flipped: false,
+  orientationIndex: 0,
   hoverCell: null,
   pendingCell: null,
   history: [],
@@ -111,11 +108,17 @@ function advanceTurn(state: GameState): GameState {
     currentPlayerIndex: nextIndex,
     turnId: state.turnId + 1,
     selectedPieceId: null,
-    rotation: 0,
-    flipped: false,
+    orientationIndex: 0,
     hoverCell: null,
     pendingCell: null,
   };
+}
+
+/** Number of unique orientations for the currently selected piece */
+function orientationCount(pieceId: string | null): number {
+  if (!pieceId) return 1;
+  const base = BASE_CELLS_MAP.get(pieceId);
+  return base ? getOrientationsCached(base).length : 1;
 }
 
 function recomputeCanPlay(players: PlayerState[], board: Board): PlayerState[] {
@@ -150,7 +153,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (action.pieceId === state.selectedPieceId) {
         return { ...state, selectedPieceId: null, pendingCell: null };
       }
-      return { ...state, selectedPieceId: action.pieceId, rotation: 0, flipped: false, pendingCell: null };
+      return { ...state, selectedPieceId: action.pieceId, orientationIndex: 0, pendingCell: null };
     }
 
     case 'SET_HOVER':
@@ -159,14 +162,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'SET_PENDING':
       return { ...state, pendingCell: action.cell };
 
-    case 'ROTATE':
-      return { ...state, rotation: (state.rotation + 1) % 4 };
+    case 'ROTATE': {
+      const n = orientationCount(state.selectedPieceId);
+      return { ...state, orientationIndex: (state.orientationIndex + 1) % n };
+    }
 
-    case 'ROTATE_CCW':
-      return { ...state, rotation: (state.rotation + 3) % 4 };
-
-    case 'FLIP':
-      return { ...state, flipped: !state.flipped };
+    case 'ROTATE_CCW': {
+      const n = orientationCount(state.selectedPieceId);
+      return { ...state, orientationIndex: (state.orientationIndex - 1 + n) % n };
+    }
 
     case 'PLACE_PIECE': {
       const { row, col } = action;
@@ -207,8 +211,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         history: [...state.history, histEntry],
         lastPlacedCells: placed,
         selectedPieceId: null,
-        rotation: 0,
-        flipped: false,
+        orientationIndex: 0,
         hoverCell: null,
         pendingCell: null,
         phase: allDone ? 'ended' : 'playing',
@@ -248,8 +251,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         currentPlayerIndex: prev.currentPlayerIndex,
         history: state.history.slice(0, -1),
         selectedPieceId: null,
-        rotation: 0,
-        flipped: false,
+        orientationIndex: 0,
         hoverCell: null,
         pendingCell: null,
         lastPlacedCells: null,
@@ -317,12 +319,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
   }
 }
 
-export function getCurrentCells(state: Pick<GameState, 'selectedPieceId' | 'rotation' | 'flipped'>): Cells {
+export function getCurrentCells(state: Pick<GameState, 'selectedPieceId' | 'orientationIndex'>): Cells {
   if (!state.selectedPieceId) return [];
   const base = BASE_CELLS_MAP.get(state.selectedPieceId);
   if (!base) return [];
-  let cells: Cells = base;
-  for (let i = 0; i < state.rotation; i++) cells = rotateCells(cells);
-  if (state.flipped) cells = flipCells(cells);
-  return normalizeCells(cells);
+  const orientations = getOrientationsCached(base);
+  const n = orientations.length;
+  const idx = ((state.orientationIndex % n) + n) % n;
+  return orientations[idx];
 }

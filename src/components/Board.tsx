@@ -68,9 +68,22 @@ export const Board: React.FC<Props> = ({ state, onCellClick, onCellTap, onCellHo
   const previewSet = useMemo(() => new Set(previewCells?.map(([r, c]) => `${r},${c}`) ?? []), [previewCells]);
   const lastPlacedSet = useMemo(() => new Set(lastPlacedCells?.map(([r, c]) => `${r},${c}`) ?? []), [lastPlacedCells]);
 
+  // First move hint: highlight the player's own start corner
+  const showStartHint = !!isHumanTurn && !!currentPlayer && !currentPlayer.hasPlaced;
+  const [startR, startC] = (currentPlayer && CORNER_MARKER[currentPlayer.color]) || [0, 0];
+
   const getCellStyle = useCallback((r: number, c: number): React.CSSProperties => {
     const key = `${r},${c}`;
     const boardColor = board[r][c];
+
+    // Start-corner highlight for the very first move (under the live preview)
+    if (showStartHint && r === startR && c === startC && !boardColor && !previewSet.has(key)) {
+      return {
+        backgroundColor: 'rgba(59,130,246,0.45)',
+        border: '2px solid #60a5fa',
+        boxShadow: 'inset 0 0 8px rgba(96,165,250,0.8)',
+      };
+    }
 
     if (previewSet.has(key)) {
       return {
@@ -107,7 +120,7 @@ export const Board: React.FC<Props> = ({ state, onCellClick, onCellTap, onCellHo
     }
 
     return { backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' };
-  }, [board, previewSet, previewValid, hintCells, lastPlacedSet]);
+  }, [board, previewSet, previewValid, hintCells, lastPlacedSet, showStartHint, startR, startC]);
 
   return (
     <div
@@ -139,6 +152,17 @@ export const Board: React.FC<Props> = ({ state, onCellClick, onCellTap, onCellHo
           ))
         )}
       </div>
+
+      {/* First-move start hint: points at the player's top-left start corner */}
+      {showStartHint && startR === 0 && startC === 0 && (
+        <div
+          className="absolute flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-600 text-white text-xs font-bold shadow-lg start-hint-bounce"
+          style={{ top: '7%', left: '7%', pointerEvents: 'none', whiteSpace: 'nowrap' }}
+        >
+          <span className="text-base leading-none">↖</span>
+          ここからスタート！
+        </div>
+      )}
     </div>
   );
 };
